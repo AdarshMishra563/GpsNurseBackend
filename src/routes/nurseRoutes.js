@@ -3,6 +3,7 @@ const nurseController = require('../controllers/nurseController');
 const protect = require('../middlewares/authMiddleware');
 const router = express.Router();
 router.post('/addNurse', nurseController.addNurse);
+router.post('/loginNurse', nurseController.loginNurse);
 router.get('/allNurses', nurseController.getAllNurses);
 
 // Get nurse status

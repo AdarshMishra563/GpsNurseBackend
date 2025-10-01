@@ -2,6 +2,7 @@ const Nurse = require('../models/Nurse');
 const generateToken = require('../utils/generateToken');
 
 // Add new nurse
+// Add new nurse
 exports.addNurse = async (req, res) => {
     try {
         const {
@@ -9,6 +10,7 @@ exports.addNurse = async (req, res) => {
             lastName,
             email,
             phoneNumber,
+            password, // Added password field
             socialIdentityType,
             socialIdentityNumber,
             licenseNumber,
@@ -22,21 +24,29 @@ exports.addNurse = async (req, res) => {
         } = req.body;
 
         // Validate required fields (coords are optional now)
-        if (!firstName || !lastName || !email || !phoneNumber || !licenseNumber || 
-            !licenseState || !yearsOfExperience || !specialization || !dateOfBirth || !address) {
+        if (!firstName || !lastName || !email || !phoneNumber || !password || 
+            !licenseNumber || !licenseState || !yearsOfExperience || !specialization || 
+            !dateOfBirth || !address) {
             return res.status(400).json({ 
                 message: 'All fields are required except socialIdentityType, socialIdentityNumber, and coords' 
             });
         }
 
-        // Just create the nurse - duplicate checks will be handled by MongoDB unique constraints
-        // and the pre-save hooks in the model will handle encryption
+        // Validate password strength (optional but recommended)
+        if (password.length < 6) {
+            return res.status(400).json({ 
+                message: 'Password must be at least 6 characters long' 
+            });
+        }
+
+        // Create the nurse - pre-save hooks will handle encryption
         const newNurse = new Nurse({
             firstName,
             lastName,
             name: `${firstName} ${lastName}`,
             email,
             phoneNumber,
+            password, // Include password
             socialIdentityType: socialIdentityType || '',
             socialIdentityNumber: socialIdentityNumber || '',
             licenseNumber,
@@ -52,7 +62,8 @@ exports.addNurse = async (req, res) => {
             } : { latitude: null, longitude: null },
             socketId: null
         });
-console.log(newNurse)
+
+        console.log(newNurse);
         await newNurse.save();
 
         // Generate JWT token
@@ -89,7 +100,68 @@ console.log(newNurse)
         return res.status(500).json({ message: 'Internal server error' });
     }
 };
+// Nurse login
+exports.loginNurse = async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
+        // Validate required fields
+        if (!email || !password) {
+            return res.status(400).json({ 
+                message: 'Email and password are required' 
+            });
+        }
+
+        // Find nurse by email
+        const nurse = await Nurse.findOne({ email });
+        
+        if (!nurse) {
+            return res.status(401).json({ 
+                message: 'Invalid email or password' 
+            });
+        }
+
+        // Check if nurse account is active
+        if (nurse.status === 'inactive' || nurse.status === 'pending') {
+            return res.status(401).json({ 
+                message: 'Account is not active. Please contact administrator.' 
+            });
+        }
+
+        // Compare passwords (since password is encrypted, we need to decrypt and compare)
+        // Note: This assumes your encryption is symmetric (same key for encrypt/decrypt)
+        const decryptedPassword = nurse.password; // The post-find hook already decrypts it
+        
+        if (password !== decryptedPassword) {
+            return res.status(401).json({ 
+                message: 'Invalid email or password' 
+            });
+        }
+
+        // Generate JWT token
+        const token = generateToken(nurse._id);
+
+        return res.status(200).json({ 
+            message: "Login successful", 
+            nurse: {
+                id: nurse._id,
+                firstName: nurse.firstName,
+                lastName: nurse.lastName,
+                name: nurse.name,
+                email: nurse.email,
+                phoneNumber: nurse.phoneNumber,
+                status: nurse.status,
+                specialization: nurse.specialization,
+                yearsOfExperience: nurse.yearsOfExperience,
+                coords: nurse.coords
+            },
+            token 
+        });
+    } catch (error) {
+        console.error('Error during nurse login:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
 // Get nurse by ID (using middleware extracted user ID)
 exports.getNurse = async (req, res) => {
     try {
