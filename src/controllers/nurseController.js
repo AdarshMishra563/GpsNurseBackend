@@ -189,36 +189,39 @@ exports.getNurse = async (req, res) => {
 // Update nurse by ID (using middleware extracted user ID)
 exports.updateNurse = async (req, res) => {
     try {
-        const nurseId = req.user.id; // From middleware
+        const nurseId = req.user.id;
         const updateData = { ...req.body };
 
-        // If firstName or lastName is updated, also update the name field
-        if (updateData.firstName || updateData.lastName) {
-            const nurse = await Nurse.findById(nurseId);
-            const firstName = updateData.firstName || nurse.firstName;
-            const lastName = updateData.lastName || nurse.lastName;
-            updateData.name = `${firstName} ${lastName}`;
-        }
-
-        // Convert yearsOfExperience to number if provided
-        if (updateData.yearsOfExperience) {
-            updateData.yearsOfExperience = parseInt(updateData.yearsOfExperience);
-        }
-
-        // Convert dateOfBirth to Date object if provided
-        if (updateData.dateOfBirth) {
-            updateData.dateOfBirth = new Date(updateData.dateOfBirth);
-        }
-
-        const updatedNurse = await Nurse.findByIdAndUpdate(
-            nurseId, 
-            updateData, 
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedNurse) {
+        const nurse = await Nurse.findById(nurseId);
+        if (!nurse) {
             return res.status(404).json({ message: 'Nurse not found' });
         }
+
+        // Update fields
+        Object.keys(updateData).forEach(field => {
+            if (field !== 'firstName' && field !== 'lastName' && field !== 'name') {
+                nurse[field] = updateData[field];
+            }
+        });
+
+        // Handle name fields specially
+        if (updateData.firstName || updateData.lastName) {
+            const firstName = updateData.firstName || nurse.firstName;
+            const lastName = updateData.lastName || nurse.lastName;
+            nurse.firstName = firstName;
+            nurse.lastName = lastName;
+            nurse.name = `${firstName} ${lastName}`;
+        }
+
+        // Convert types
+        if (updateData.yearsOfExperience) {
+            nurse.yearsOfExperience = parseInt(updateData.yearsOfExperience);
+        }
+        if (updateData.dateOfBirth) {
+            nurse.dateOfBirth = new Date(updateData.dateOfBirth);
+        }
+
+        const updatedNurse = await nurse.save(); // This triggers your encryption hooks
 
         return res.status(200).json({ 
             message: "Nurse updated successfully", 
@@ -230,7 +233,6 @@ exports.updateNurse = async (req, res) => {
             return res.status(400).json({ message: error.message });
         }
         if (error.code === 11000) {
-            // Handle duplicate key errors from MongoDB unique constraints
             const field = Object.keys(error.keyPattern)[0];
             return res.status(400).json({ 
                 message: `Nurse with this ${field} already exists`,
