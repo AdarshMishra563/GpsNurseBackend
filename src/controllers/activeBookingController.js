@@ -50,7 +50,7 @@ console.log(req.user.id)
     if (!requesterRole) {
       return res.status(403).json({ message: 'Requester not found' });
     }
-    console.log(requesterDoc)
+ 
 
     // 2️⃣ Build query for latest active booking
     let query = { status: { $nin: ['completed', 'cancelled'] } };

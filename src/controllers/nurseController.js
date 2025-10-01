@@ -1,6 +1,6 @@
 const Nurse = require('../models/Nurse');
 const generateToken = require('../utils/generateToken');
-
+          const { encrypt } = require('../utils/encryption');
 // Add new nurse
 // Add new nurse
 exports.addNurse = async (req, res) => {
@@ -104,7 +104,7 @@ exports.addNurse = async (req, res) => {
 exports.loginNurse = async (req, res) => {
     try {
         const { email, password } = req.body;
-
+console.log(password,email)
         // Validate required fields
         if (!email || !password) {
             return res.status(400).json({ 
@@ -112,9 +112,13 @@ exports.loginNurse = async (req, res) => {
             });
         }
 
-        // Find nurse by email
-        const nurse = await Nurse.findOne({ email });
-        
+        // Find nurse by email;
+
+
+        const encryptedEmail = encrypt(email);
+        console.log(encryptedEmail,"encryptedddd")
+        const nurse = await Nurse.findOne({ email:encryptedEmail });
+       console.log(nurse)
         if (!nurse) {
             return res.status(401).json({ 
                 message: 'Invalid email or password' 
@@ -122,7 +126,7 @@ exports.loginNurse = async (req, res) => {
         }
 
         // Check if nurse account is active
-        if (nurse.status === 'inactive' || nurse.status === 'pending') {
+        if (nurse.status === 'unVerified' || nurse.status === 'pending') {
             return res.status(401).json({ 
                 message: 'Account is not active. Please contact administrator.' 
             });
@@ -131,7 +135,7 @@ exports.loginNurse = async (req, res) => {
         // Compare passwords (since password is encrypted, we need to decrypt and compare)
         // Note: This assumes your encryption is symmetric (same key for encrypt/decrypt)
         const decryptedPassword = nurse.password; // The post-find hook already decrypts it
-        
+        console.log(password,email,decryptedPassword)
         if (password !== decryptedPassword) {
             return res.status(401).json({ 
                 message: 'Invalid email or password' 
