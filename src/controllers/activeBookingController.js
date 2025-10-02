@@ -233,7 +233,7 @@ exports.getNonPendingBookings = async (req, res) => {
     }
 
     // 2️⃣ Build query for all non-pending bookings
-    let query = { status: { $ne: 'pending' } }; // all except pending
+    let query = { status: { $ne: 'accepted' } }; // all except pending
     if (requesterRole === 'user') query.userId = requesterId;
     else if (requesterRole === 'nurse') query.nurseId = requesterId;
 
