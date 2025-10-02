@@ -17,7 +17,7 @@ const nurseSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    image: String,
+    image: String,fcm:String,
     email: {
         type: String,
         required: true,

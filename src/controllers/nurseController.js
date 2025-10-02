@@ -3,6 +3,7 @@ const generateToken = require('../utils/generateToken');
           const { encrypt } = require('../utils/encryption');
 // Add new nurse
 // Add new nurse
+// Add Nurse
 exports.addNurse = async (req, res) => {
     try {
         const {
@@ -10,7 +11,7 @@ exports.addNurse = async (req, res) => {
             lastName,
             email,
             phoneNumber,
-            password, // Added password field
+            password,
             socialIdentityType,
             socialIdentityNumber,
             licenseNumber,
@@ -20,33 +21,29 @@ exports.addNurse = async (req, res) => {
             dateOfBirth,
             address,
             coords,
-            status
+            status,
+            fcm // new field
         } = req.body;
 
-        // Validate required fields (coords are optional now)
         if (!firstName || !lastName || !email || !phoneNumber || !password || 
             !licenseNumber || !licenseState || !yearsOfExperience || !specialization || 
             !dateOfBirth || !address) {
             return res.status(400).json({ 
-                message: 'All fields are required except socialIdentityType, socialIdentityNumber, and coords' 
+                message: 'All fields are required except socialIdentityType, socialIdentityNumber, coords, and fcm' 
             });
         }
 
-        // Validate password strength (optional but recommended)
         if (password.length < 6) {
-            return res.status(400).json({ 
-                message: 'Password must be at least 6 characters long' 
-            });
+            return res.status(400).json({ message: 'Password must be at least 6 characters long' });
         }
 
-        // Create the nurse - pre-save hooks will handle encryption
         const newNurse = new Nurse({
             firstName,
             lastName,
             name: `${firstName} ${lastName}`,
             email,
             phoneNumber,
-            password, // Include password
+            password,
             socialIdentityType: socialIdentityType || '',
             socialIdentityNumber: socialIdentityNumber || '',
             licenseNumber,
@@ -56,17 +53,14 @@ exports.addNurse = async (req, res) => {
             dateOfBirth: new Date(dateOfBirth),
             address,
             status: status || 'pending',
-            coords: coords ? {
-                latitude: coords.latitude,
-                longitude: coords.longitude
-            } : { latitude: null, longitude: null },
-            socketId: null
+            coords: coords ? { latitude: coords.latitude, longitude: coords.longitude } : { latitude: null, longitude: null },
+            socketId: null,
+            fcm: fcm || null // store FCM token
         });
 
         console.log(newNurse);
         await newNurse.save();
 
-        // Generate JWT token
         const token = generateToken(newNurse._id);
 
         return res.status(201).json({ 
@@ -80,7 +74,8 @@ exports.addNurse = async (req, res) => {
                 phoneNumber: newNurse.phoneNumber,
                 status: newNurse.status,
                 specialization: newNurse.specialization,
-                yearsOfExperience: newNurse.yearsOfExperience
+                yearsOfExperience: newNurse.yearsOfExperience,
+                fcm: newNurse.fcm
             },
             token 
         });
@@ -90,7 +85,6 @@ exports.addNurse = async (req, res) => {
             return res.status(400).json({ message: error.message });
         }
         if (error.code === 11000) {
-            // Handle duplicate key errors from MongoDB unique constraints
             const field = Object.keys(error.keyPattern)[0];
             return res.status(400).json({ 
                 message: `Nurse with this ${field} already exists`,
@@ -100,49 +94,42 @@ exports.addNurse = async (req, res) => {
         return res.status(500).json({ message: 'Internal server error' });
     }
 };
-// Nurse login
+
+// Nurse Login
 exports.loginNurse = async (req, res) => {
     try {
-        const { email, password } = req.body;
-console.log(password,email)
-        // Validate required fields
+        const { email, password, fcm } = req.body;
+        console.log(password,email);
+
         if (!email || !password) {
-            return res.status(400).json({ 
-                message: 'Email and password are required' 
-            });
+            return res.status(400).json({ message: 'Email and password are required' });
         }
-
-        // Find nurse by email;
-
 
         const encryptedEmail = encrypt(email);
-        console.log(encryptedEmail,"encryptedddd")
-        const nurse = await Nurse.findOne({ email:encryptedEmail });
-       console.log(nurse)
+        console.log(encryptedEmail,"encryptedddd");
+        const nurse = await Nurse.findOne({ email: encryptedEmail });
+        console.log(nurse);
+
         if (!nurse) {
-            return res.status(401).json({ 
-                message: 'Invalid email or password' 
-            });
+            return res.status(401).json({ message: 'Invalid email or password' });
         }
 
-        // Check if nurse account is active
         if (nurse.status === 'unVerified' || nurse.status === 'pending') {
-            return res.status(401).json({ 
-                message: 'Account is not active. Please contact administrator.' 
-            });
+            return res.status(401).json({ message: 'Account is not active. Please contact administrator.' });
         }
 
-        // Compare passwords (since password is encrypted, we need to decrypt and compare)
-        // Note: This assumes your encryption is symmetric (same key for encrypt/decrypt)
-        const decryptedPassword = nurse.password; // The post-find hook already decrypts it
-        console.log(password,email,decryptedPassword)
+        const decryptedPassword = nurse.password; // post-find hook decrypts
+        console.log(password,email,decryptedPassword);
         if (password !== decryptedPassword) {
-            return res.status(401).json({ 
-                message: 'Invalid email or password' 
-            });
+            return res.status(401).json({ message: 'Invalid email or password' });
         }
 
-        // Generate JWT token
+        // Update FCM token if provided
+        if (fcm) {
+            nurse.fcm = fcm;
+            await nurse.save();
+        }
+
         const token = generateToken(nurse._id);
 
         return res.status(200).json({ 
@@ -157,7 +144,8 @@ console.log(password,email)
                 status: nurse.status,
                 specialization: nurse.specialization,
                 yearsOfExperience: nurse.yearsOfExperience,
-                coords: nurse.coords
+                coords: nurse.coords,
+                fcm: nurse.fcm
             },
             token 
         });
@@ -166,6 +154,7 @@ console.log(password,email)
         return res.status(500).json({ message: 'Internal server error' });
     }
 };
+
 // Get nurse by ID (using middleware extracted user ID)
 exports.getNurse = async (req, res) => {
     try {

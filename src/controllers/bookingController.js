@@ -104,6 +104,24 @@ exports.createBooking = async (req, res) => {
             nurseIds: nurseIdsToNotify,
             data: bookingData,
         });
+// ---- Fire Notification URL for all nurses (fire-and-forget) ----
+nursesToNotify.forEach(nurse => {
+  axios.post("http://10.227.241.118:5000/notification/notify", {
+    id: nurse.id, // <-- must be 'id' to match backend
+    role: "nurse",
+    type: "newBooking",
+    bookingId: bookingData.bookingId || '',
+    userId: bookingData.userId || '',
+    userName: bookingData.userName || '',
+    latitude: bookingData.latitude?.toString() || '0',
+    longitude: bookingData.longitude?.toString() || '0',
+    amount: nurse.estimateCharge?.toString() || '0',
+    distance: nurse.distance?.toString() || '0'
+  }).catch(err => {
+    console.error(`Error sending notification for nurse ${nurse.id}:`, err.response?.data || err.message);
+  });
+});
+
 
         return res.status(201).json({
             message: 'Booking created and nearby nurses notified!',
