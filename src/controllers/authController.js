@@ -13,7 +13,7 @@ console.log(phone)
 
     let user;
 
-    // --- Email login via Firebase ---
+    
     if (firebaseToken) {
       const decodedToken = await admin.auth().verifyIdToken(firebaseToken);
       const { email, name } = decodedToken;
