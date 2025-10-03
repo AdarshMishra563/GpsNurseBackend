@@ -2,40 +2,31 @@ const ActiveBooking = require('../models/ActiveBooking');
 const Booking = require('../models/Booking'); // your main Booking model
 const Nurse = require('../models/Nurse');
  const User = require('../models/User');
-const Username = require('../models/Username');
- const { decrypt } = require('../utils/encryption');
 exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
   console.log("dbacepteddddd")
   
-  // First, check if the booking already exists
-  const existingBooking = await ActiveBooking.findOne({ bookingId: bookingDoc.bookingId.toString() });
-  
   let userPhone = null;
   let userName = null;
-  
-  // Only fetch and decrypt user data if this is a new booking (not existing)
-  if (!existingBooking) {
-    try {
-      // Get user by userId
-      const user = await User.findById(bookingDoc.userId);
-      
-      if (user) {
-        // Get user's phone (no decryption needed as it's stored plain)
-        userPhone = decrypt(user.phone);
-        
-        // Get and decrypt user name
-        const userNameDoc = await Username.findOne({ userId: bookingDoc.userId });
-        if (userNameDoc) {
-        
-          const decryptedFirstName = userNameDoc.firstName ? decrypt(userNameDoc.firstName) : '';
-          const decryptedLastName = userNameDoc.lastName ? decrypt(userNameDoc.lastName) : '';
-          userName = `${decryptedFirstName} ${decryptedLastName}`.trim();
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      // Continue without user data if there's an error
+
+  try {
+    // Get user by userId - phone is stored encrypted in User collection
+    const user = await User.findById(bookingDoc.userId);
+    
+    if (user && user.phone) {
+      // Decrypt the phone number from User collection
+      userPhone = decrypt(user.phone);
     }
+    
+    // Get and decrypt user name from UserName collection
+    const userNameDoc = await UserName.findOne({ userId: bookingDoc.userId });
+    if (userNameDoc) {
+      const decryptedFirstName = userNameDoc.firstName ? decrypt(userNameDoc.firstName) : '';
+      const decryptedLastName = userNameDoc.lastName ? decrypt(userNameDoc.lastName) : '';
+      userName = `${decryptedFirstName} ${decryptedLastName}`.trim();
+    }
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    // Continue without user data if there's an error
   }
 
   const payload = {
@@ -50,29 +41,19 @@ exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
     status: 'accepted',
     image: nurseDoc?.image || "https://sp.yimg.com/ib/th/id/OIP.kH1nK8Nyqh0lSDp1KA0V0wHaLH?pid=Api&w=148&h=148&c=7&dpr=2&rs=1",
     currentCoords: nurseDoc.coords || null,
-    locationHistory: nurseDoc.coords ? [{ ...nurseDoc.coords, timestamp: new Date() }] : [],
+    locationHistory: nurseDoc.coords ? [ { ...nurseDoc.coords, timestamp: new Date() } ] : [],
     chat: [],
     metadata: {
       acceptedAt: bookingDoc.acceptedAt || new Date(),
     }
   };
 
-  // Only add userPhone and userName to payload if they exist AND this is a new booking
-  if (!existingBooking) {
-    if (userPhone) {
-      payload.userPhone = userPhone;
-    }
-    if (userName) {
-      payload.userName = userName;
-    }
-  } else {
-    // For existing booking, preserve existing userPhone and userName if they exist
-    if (existingBooking.userPhone) {
-      payload.userPhone = existingBooking.userPhone;
-    }
-    if (existingBooking.userName) {
-      payload.userName = existingBooking.userName;
-    }
+  // Add decrypted userPhone and userName to payload if available
+  if (userPhone) {
+    payload.userPhone = userPhone;
+  }
+  if (userName) {
+    payload.userName = userName;
   }
 
   // upsert into DB
@@ -84,6 +65,7 @@ exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
 
   return active;
 };
+
 exports.getActiveBookingByUserOrNurse = async (req, res) => {
   try {
     const requesterId = req.user.id;
