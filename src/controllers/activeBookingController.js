@@ -21,7 +21,7 @@ exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
       
       if (user) {
         // Get user's phone (no decryption needed as it's stored plain)
-        userPhone = user.phone;
+        userPhone = decrypt(user.phone);
         
         // Get and decrypt user name
         const userNameDoc = await Username.findOne({ userId: bookingDoc.userId });
