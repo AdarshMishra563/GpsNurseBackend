@@ -145,7 +145,12 @@ exports.completeBooking = async (req, res) => {
 
     // emit event
     if (req.internalEvents) req.internalEvents.emit('activeBookingCompleted', { bookingId });
+    const booking = await ActiveBooking.findOne({ bookingId });
 
+   await Nurse.findByIdAndUpdate(
+      booking.nurseId,
+      { $set: { status: 'inactive', updatedAt: new Date() } }
+    );
     return res.status(200).json({ message: 'Booking completed', active: updated });
   } catch (err) {
     console.error('completeBooking error', err);
