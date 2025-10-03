@@ -7,7 +7,8 @@ const bookingSchema = new mongoose.Schema({
     latitude: { type: Number, required: true },
     longitude: { type: Number, required: true },
     status: { type: String, default: 'pending' },  // 'pending' | 'accepted'
-    nurseId: { type: String, default: null },     // Nurse who accepted
+    nurseId: { type: String, default: null }, 
+    type:String,    // Nurse who accepted
     acceptedAt: { type: Date },
     timestamp: { type: Date, default: Date.now }
 });

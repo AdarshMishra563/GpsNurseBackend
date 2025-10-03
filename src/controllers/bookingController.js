@@ -34,7 +34,7 @@ function deg2rad(deg) {
 }
 exports.createBooking = async (req, res) => {
     try {
-        const { latitude , longitude, userName } = req.body;
+        const { latitude , longitude, userName,type } = req.body;
         const userId = req.user.id;
         console.log(userId);
 
@@ -95,6 +95,7 @@ exports.createBooking = async (req, res) => {
             latitude,
             longitude,
             status: 'pending',
+            type,
             timestamp: new Date()
         }
    const db= await Booking.create(bookingData);
@@ -110,6 +111,7 @@ nursesToNotify.forEach(nurse => {
     id: nurse.id, // <-- must be 'id' to match backend
     role: "nurse",
     type: "newBooking",
+    role:bookingData.type,
     bookingId: bookingData.bookingId || '',
     userId: bookingData.userId || '',
     userName: bookingData.userName || '',
@@ -224,7 +226,6 @@ exports.acceptBooking = async (req, res) => {
 
     // 3️⃣ Get nurse info
     const nurse = await Nurse.findById(nurseId);
-    console.log(nurse,"nurseeeeee")
     nurse.status='engaged';
     await nurse.save();
 

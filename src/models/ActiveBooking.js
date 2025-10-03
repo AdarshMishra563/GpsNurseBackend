@@ -33,6 +33,7 @@ const ActiveBookingSchema = new mongoose.Schema({
   chat: { type: [mongoose.Schema.Types.Mixed], default: [] }, // ephemeral or persisted messages
   payment: PaymentSchema,
   amount: Number,
+  type:String,
   metadata: mongoose.Schema.Types.Mixed,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

@@ -41,6 +41,7 @@ exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
     latitude: bookingDoc.latitude,
     longitude: bookingDoc.longitude,
     amount: bookingDoc.amount,
+    type:bookingDoc.type,
     status: 'accepted',
     image: nurseDoc?.image || "https://sp.yimg.com/ib/th/id/OIP.kH1nK8Nyqh0lSDp1KA0V0wHaLH?pid=Api&w=148&h=148&c=7&dpr=2&rs=1",
     currentCoords: nurseDoc.coords || null,
@@ -278,25 +279,42 @@ exports.getNonPendingBookings = async (req, res) => {
       return res.status(403).json({ message: 'Requester not found' });
     }
 
-    // 2️⃣ Build query for all non-pending bookings
-    let query = { status: { $ne: 'accepted' } }; // all except pending
+    // 2️⃣ Pagination params
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // 3️⃣ Build query (exclude "accepted")
+    let query = { status: { $ne: 'accepted' } };
     if (requesterRole === 'user') query.userId = requesterId;
     else if (requesterRole === 'nurse') query.nurseId = requesterId;
 
-    // 3️⃣ Fetch all sorted by latest first
+    // 4️⃣ Fetch bookings (only selected fields)
     const bookings = await ActiveBooking.find(query)
-      .sort({ createdAt: -1 })
+      .select('bookingId userId nurseId userName amount type status createdAt')
+      .sort({ createdAt: -1 }) // newest first
+      .skip(skip)
+      .limit(limit)
       .lean();
+
+    // 5️⃣ Count total for pagination
+    const total = await ActiveBooking.countDocuments(query);
 
     if (!bookings.length) {
       return res.status(404).json({ message: 'No bookings found' });
     }
 
-    // 4️⃣ Respond
+    // 6️⃣ Respond
     return res.status(200).json({
       requester: {
         id: requesterId,
         role: requesterRole,
+      },
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
       bookings,
     });
@@ -305,3 +323,4 @@ exports.getNonPendingBookings = async (req, res) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
