@@ -106,7 +106,7 @@ exports.createBooking = async (req, res) => {
         });
 // ---- Fire Notification URL for all nurses (fire-and-forget) ----
 nursesToNotify.forEach(nurse => {
-  axios.post("http://10.227.241.118:5000/notification/notify", {
+  axios.post("https://gpsnursebackend.onrender.com/notification/notify", {
     id: nurse.id, // <-- must be 'id' to match backend
     role: "nurse",
     type: "newBooking",
