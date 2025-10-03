@@ -212,7 +212,12 @@ exports.cancelBooking = async (req, res) => {
     if (req.internalEvents) {
       req.internalEvents.emit('activeBookingCancelled', { bookingId });
     }
+ const booking = await ActiveBooking.findOne({ bookingId });
 
+  await Nurse.findByIdAndUpdate(
+      booking.nurseId,
+      { $set: { status: 'active', updatedAt: new Date() } }
+    );
     return res.status(200).json({ message: 'Booking cancelled', active: updated });
   } catch (err) {
     console.error('cancelBooking error', err);
