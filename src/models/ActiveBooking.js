@@ -20,16 +20,19 @@ const ActiveBookingSchema = new mongoose.Schema({
   bookingId: { type: String, required: true, unique: true }, // same ID used in your Booking model
   bookingRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' }, // optional link
   userId: { type: String, required: true },
-  nurseName:String,
-   image:String,
-   latitude:Number,longitude:Number,
+  userPhone: { type: String }, // Added user phone field
+  userName: { type: String }, // Added user name field
+  nurseName: String,
+  image: String,
+  latitude: Number,
+  longitude: Number,
   nurseId: { type: String, required: true },
   status: { type: String, default: 'accepted' }, // active|accepted|in_progress|completed|cancelled
   currentCoords: LocationSchema,                 // latest location point
   locationHistory: { type: [LocationSchema], default: [] }, // append-only
   chat: { type: [mongoose.Schema.Types.Mixed], default: [] }, // ephemeral or persisted messages
   payment: PaymentSchema,
-  amount:Number,
+  amount: Number,
   metadata: mongoose.Schema.Types.Mixed,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
