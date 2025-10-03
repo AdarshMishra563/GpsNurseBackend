@@ -224,6 +224,8 @@ exports.acceptBooking = async (req, res) => {
 
     // 3️⃣ Get nurse info
     const nurse = await Nurse.findById(nurseId);
+    nurse.status='engaged';
+    await nurse.save();
 
     // 4️⃣ Create or upsert ActiveBooking in DB
     const activeBooking = await createOrUpsertActiveBooking({ bookingDoc: existingBooking,
