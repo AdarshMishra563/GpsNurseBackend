@@ -1,7 +1,9 @@
+const { decrypt } = require('../utils/encryption')
 const ActiveBooking = require('../models/ActiveBooking');
 const Booking = require('../models/Booking'); // your main Booking model
 const Nurse = require('../models/Nurse');
  const User = require('../models/User');
+const Username = require('../models/Username');
 exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
   console.log("dbacepteddddd")
   
@@ -11,18 +13,19 @@ exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
   try {
     // Get user by userId - phone is stored encrypted in User collection
     const user = await User.findById(bookingDoc.userId);
-    
+    console.log(user)
     if (user && user.phone) {
       // Decrypt the phone number from User collection
       userPhone = decrypt(user.phone);
     }
-    
+    console.log(user,userPhone,"phonnnnnnnnnnnnnnnnne")
     // Get and decrypt user name from UserName collection
-    const userNameDoc = await UserName.findOne({ userId: bookingDoc.userId });
+    const userNameDoc = await Username.findOne({ userId: bookingDoc.userId });
     if (userNameDoc) {
       const decryptedFirstName = userNameDoc.firstName ? decrypt(userNameDoc.firstName) : '';
       const decryptedLastName = userNameDoc.lastName ? decrypt(userNameDoc.lastName) : '';
       userName = `${decryptedFirstName} ${decryptedLastName}`.trim();
+      console.log(userNameDoc,userName,"nameeeeeeeeeeeeeeeeee")
     }
   } catch (error) {
     console.error('Error fetching user data:', error);
@@ -34,7 +37,7 @@ exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
     bookingRef: bookingDoc._id,
     userId: bookingDoc.userId.toString(),
     nurseId: nurseDoc._id.toString(),
-    nurseName: nurseDoc.name,
+    nurseName: decrypt(nurseDoc.name),
     latitude: bookingDoc.latitude,
     longitude: bookingDoc.longitude,
     amount: bookingDoc.amount,
@@ -55,7 +58,7 @@ exports.createOrUpsertActiveBooking = async ({ bookingDoc, nurseDoc }) => {
   if (userName) {
     payload.userName = userName;
   }
-
+console.log(payload)
   // upsert into DB
   const active = await ActiveBooking.findOneAndUpdate(
     { bookingId: payload.bookingId },

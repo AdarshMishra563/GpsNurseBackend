@@ -224,6 +224,7 @@ exports.acceptBooking = async (req, res) => {
 
     // 3️⃣ Get nurse info
     const nurse = await Nurse.findById(nurseId);
+    console.log(nurse,"nurseeeeee")
     nurse.status='engaged';
     await nurse.save();
 

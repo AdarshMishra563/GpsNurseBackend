@@ -307,6 +307,7 @@ internalEvents.on('activeBookingCancelled', ({ bookingId }) => {
 
 
 console.log(generateToken("68c684fd3e4205c960f36fa3"),"generated")
+console.log(generateToken("68dda56421f3477da62f1df9"),"generated2")
 app.post('/test-location-update',async (req, res) => {
     try {
   const {bookingId,coords} =req.body;
