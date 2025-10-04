@@ -48,5 +48,6 @@ router.post('/:bookingId/payment', protect, activeBookingController.updatePaymen
 router.post('/:bookingId/complete', protect, activeBookingController.completeBooking);
 router.post('/:bookingId/cancel', protect, activeBookingController.cancelBooking);
 router.get('/allBookings', protect, activeBookingController.getNonPendingBookings);
+router.get('/getBookingDetails', protect, activeBookingController.getBookingDetails);
 
 module.exports = router;
