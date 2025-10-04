@@ -323,4 +323,154 @@ exports.getNonPendingBookings = async (req, res) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+exports.getBookingDetails = async (req, res) => {
+  try {
+    const { nurseId, userId, bookingId } = req.query;
+    const requesterId = req.user.id;
 
+    // Validate required parameter
+    if (!bookingId) {
+      return res.status(400).json({ 
+        message: 'bookingId is required' 
+      });
+    }
+
+    // 1️⃣ Find requester role (user or nurse)
+    let requesterRole;
+    let requesterDoc = await User.findById(requesterId).lean();
+    if (requesterDoc) {
+      requesterRole = 'user';
+    } else {
+      requesterDoc = await Nurse.findById(requesterId).lean();
+      if (requesterDoc) requesterRole = 'nurse';
+    }
+
+    if (!requesterRole) {
+      return res.status(403).json({ message: 'Requester not found' });
+    }
+
+    // 2️⃣ Build query with bookingId as primary filter
+    let query = { bookingId: bookingId };
+    
+    // Add additional filters if provided
+    if (nurseId) query.nurseId = nurseId;
+    if (userId) query.userId = userId;
+
+    // 3️⃣ Fetch booking details directly from ActiveBooking
+    const booking = await ActiveBooking.findOne(query).lean();
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    // 4️⃣ Authorization check - ensure requester is involved in this booking
+    const isAuthorized = 
+      requesterRole === 'user' && booking.userId === requesterId ||
+      requesterRole === 'nurse' && booking.nurseId === requesterId;
+
+    if (!isAuthorized) {
+      return res.status(403).json({ 
+        message: 'Not authorized to view this booking' 
+      });
+    }
+
+    // 5️⃣ Fetch additional user and nurse details separately
+    const [userDetails, nurseDetails] = await Promise.all([
+      User.findById(booking.userId).select('name email phone profilePicture dateOfBirth').lean(),
+      Nurse.findById(booking.nurseId).select('name email phone specialization experience profilePicture verificationStatus ratings').lean()
+    ]);
+
+    // 6️⃣ Transform location history to [longitude, latitude] format
+    const transformLocationData = (locationArray) => {
+      if (!locationArray || !Array.isArray(locationArray)) return [];
+      
+      return locationArray.map(location => {
+        if (location && typeof location.longitude === 'number' && typeof location.latitude === 'number') {
+          return [location.longitude, location.latitude];
+        }
+        return null;
+      }).filter(coord => coord !== null); // Remove any invalid entries
+    };
+
+    const routeCoordinates = transformLocationData(booking.locationHistory);
+    const currentCoordinate = booking.currentCoords ? 
+      [booking.currentCoords.longitude, booking.currentCoords.latitude] : 
+      null;
+
+    // 7️⃣ Format response with separated data
+    const bookingDetails = {
+      bookingInfo: {
+        _id: booking._id,
+        bookingId: booking.bookingId,
+        type: booking.type,
+        status: booking.status,
+        amount: booking.amount,
+        userName: booking.userName,
+        userPhone: booking.userPhone,
+        nurseName: booking.nurseName,
+        image: booking.image,
+        latitude: booking.latitude,
+        longitude: booking.longitude,
+        currentCoords: currentCoordinate,
+        locationHistory: routeCoordinates, // Transformed format
+        chat: booking.chat,
+        payment: booking.payment,
+        metadata: booking.metadata,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt
+      },
+      userInfo: userDetails ? {
+        _id: userDetails._id,
+        name: userDetails.name,
+        email: userDetails.email,
+        phone: userDetails.phone,
+        profilePicture: userDetails.profilePicture,
+        dateOfBirth: userDetails.dateOfBirth
+      } : {
+        // Fallback to data from ActiveBooking if user not found
+        _id: booking.userId,
+        name: booking.userName,
+        phone: booking.userPhone
+      },
+      nurseInfo: nurseDetails ? {
+        _id: nurseDetails._id,
+        name: nurseDetails.name,
+        email: nurseDetails.email,
+        phone: nurseDetails.phone,
+        specialization: nurseDetails.specialization,
+        experience: nurseDetails.experience,
+        profilePicture: nurseDetails.profilePicture,
+        verificationStatus: nurseDetails.verificationStatus,
+        ratings: nurseDetails.ratings
+      } : {
+        // Fallback to data from ActiveBooking if nurse not found
+        _id: booking.nurseId,
+        name: booking.nurseName
+      },
+      requester: {
+        id: requesterId,
+        role: requesterRole
+      }
+    };
+
+    // 8️⃣ Respond with detailed booking information
+    return res.status(200).json({
+      message: 'Booking details retrieved successfully',
+      booking: bookingDetails
+    });
+
+  } catch (err) {
+    console.error('getBookingDetails error', err);
+    
+    if (err.name === 'CastError') {
+      return res.status(400).json({ 
+        message: 'Invalid ID format' 
+      });
+    }
+    
+    return res.status(500).json({ 
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
