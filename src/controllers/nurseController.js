@@ -1,9 +1,8 @@
 const Nurse = require('../models/Nurse');
 const generateToken = require('../utils/generateToken');
-          const { encrypt } = require('../utils/encryption');
+const { encrypt } = require('../utils/encryption');
+
 // Add new nurse
-// Add new nurse
-// Add Nurse
 exports.addNurse = async (req, res) => {
     try {
         const {
@@ -22,7 +21,7 @@ exports.addNurse = async (req, res) => {
             address,
             coords,
             status,
-            fcm // new field
+            fcm
         } = req.body;
 
         if (!firstName || !lastName || !email || !phoneNumber || !password || 
@@ -37,6 +36,38 @@ exports.addNurse = async (req, res) => {
             return res.status(400).json({ message: 'Password must be at least 6 characters long' });
         }
 
+        // Check for existing nurses with the same unique fields
+        // Since the data comes decrypted from the database, we can compare directly
+        const existingNurse = await Nurse.findOne({
+            $or: [
+                { email: email },
+                { phoneNumber: phoneNumber },
+                { licenseNumber: licenseNumber },
+                ...(socialIdentityNumber ? [{ socialIdentityNumber: socialIdentityNumber }] : [])
+            ]
+        });
+
+        if (existingNurse) {
+            // Determine which field caused the conflict by comparing decrypted values
+            let conflictField = '';
+
+            if (existingNurse.email === email) {
+                conflictField = 'email';
+            } else if (existingNurse.phoneNumber === phoneNumber) {
+                conflictField = 'phone number';
+            } else if (existingNurse.licenseNumber === licenseNumber) {
+                conflictField = 'license number';
+            } else if (socialIdentityNumber && existingNurse.socialIdentityNumber === socialIdentityNumber) {
+                conflictField = 'social identity number';
+            }
+
+            return res.status(400).json({ 
+                message: `Nurse with this ${conflictField} already exists`,
+                errorType: conflictField.replace(' ', '')
+            });
+        }
+
+        // Create new nurse
         const newNurse = new Nurse({
             firstName,
             lastName,
@@ -55,10 +86,9 @@ exports.addNurse = async (req, res) => {
             status: status || 'pending',
             coords: coords ? { latitude: coords.latitude, longitude: coords.longitude } : { latitude: null, longitude: null },
             socketId: null,
-            fcm: fcm || null // store FCM token
+            fcm: fcm || null
         });
 
-        console.log(newNurse);
         await newNurse.save();
 
         const token = generateToken(newNurse._id);
