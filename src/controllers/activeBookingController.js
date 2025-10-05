@@ -279,7 +279,8 @@ exports.getNonPendingBookings = async (req, res) => {
       return res.status(403).json({ message: 'Requester not found' });
     }
 
-    // 2️⃣ Pagination params
+    // 2️⃣ Check if pagination is requested
+    const hasPagination = req.query.page !== undefined;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -290,14 +291,18 @@ exports.getNonPendingBookings = async (req, res) => {
     else if (requesterRole === 'nurse') query.nurseId = requesterId;
 
     // 4️⃣ Fetch bookings (only selected fields)
-    const bookings = await ActiveBooking.find(query)
+    let bookingsQuery = ActiveBooking.find(query)
       .select('bookingId userId nurseId userName amount type status createdAt')
-      .sort({ createdAt: -1 }) // newest first
-      .skip(skip)
-      .limit(limit)
-      .lean();
+      .sort({ createdAt: -1 }); // newest first
 
-    // 5️⃣ Count total for pagination
+    // Apply pagination only if page query parameter exists
+    if (hasPagination) {
+      bookingsQuery = bookingsQuery.skip(skip).limit(limit);
+    }
+
+    const bookings = await bookingsQuery.lean();
+
+    // 5️⃣ Count total for pagination info
     const total = await ActiveBooking.countDocuments(query);
 
     if (!bookings.length) {
@@ -305,19 +310,25 @@ exports.getNonPendingBookings = async (req, res) => {
     }
 
     // 6️⃣ Respond
-    return res.status(200).json({
+    const response = {
       requester: {
         id: requesterId,
         role: requesterRole,
       },
-      pagination: {
+      bookings,
+    };
+
+    // Include pagination info only if pagination was requested
+    if (hasPagination) {
+      response.pagination = {
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
-      },
-      bookings,
-    });
+      };
+    }
+
+    return res.status(200).json(response);
   } catch (err) {
     console.error('getNonPendingBookings error', err);
     return res.status(500).json({ message: 'Internal server error' });
