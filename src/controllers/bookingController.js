@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const Booking = require('../models/Booking');
 const axios = require('axios');
 const { createOrUpsertActiveBooking } = require('./activeBookingController');
+const { decrypt } = require('../utils/encryption');
 dotenv.config();
 
 async function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
@@ -254,7 +255,7 @@ exports.acceptBooking = async (req, res) => {
       amount:amount,
       nurseData: {
         id: nurse.id,
-        name: nurse.name,
+        name: decrypt(nurse.name),
         coords: nurse.coords || null,
         image:nurse.image
       },
