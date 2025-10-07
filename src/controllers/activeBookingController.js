@@ -292,7 +292,7 @@ exports.getNonPendingBookings = async (req, res) => {
 
     // 4️⃣ Fetch bookings (only selected fields)
     let bookingsQuery = ActiveBooking.find(query)
-      .select('bookingId userId nurseId userName amount type status createdAt')
+      .select('bookingId userId nurseId userName nurseName amount type status createdAt')
       .sort({ createdAt: -1 }); // newest first
 
     // Apply pagination only if page query parameter exists
