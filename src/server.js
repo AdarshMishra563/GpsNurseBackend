@@ -22,6 +22,7 @@ const activeBookingRoutes = require('./routes/activeBookingRoutes');
 const paymentRoutes = require('./routes/stripeRoutes');
 const notificationRoutes = require('./routes/notificationRoute');
 const assessmentRoutes = require('./routes/assesmentDataRoutes');
+const appointmentRoutes = require('./routes/appointmentRoute');
 const generateToken = require('./utils/generateToken');
 
 const app = express();
@@ -68,6 +69,7 @@ app.use('/active',activeBookingRoutes);
 app.use('/payment',paymentRoutes);
 app.use('/notification',notificationRoutes);
 app.use('/assessment',assessmentRoutes);
+app.use('/appointment',appointmentRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
