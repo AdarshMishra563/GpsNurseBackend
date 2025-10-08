@@ -62,7 +62,7 @@ const nurseSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true
-    },
+    },rating:Number,
     dateOfBirth: {
         type: Date,
         required: true

@@ -283,13 +283,52 @@ exports.getNurseStatus = async (req, res) => {
     }
 };
 
-// Get all nurses (optional additional route)
 exports.getAllNurses = async (req, res) => {
     try {
-        const nurses = await Nurse.find().sort({ createdAt: -1 });
+        const { search, page = 1, limit = 10 } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Build search query
+        let searchQuery = {};
+        
+        if (search) {
+            const searchRegex = new RegExp(search, 'i');
+            searchQuery = {
+                $or: [
+                    { name: searchRegex },
+                    { specialization: searchRegex },
+                    { firstName: searchRegex },
+                    { lastName: searchRegex }
+                ]
+            };
+        }
+
+        // Get nurses with search, sorting, and pagination
+        const nurses = await Nurse.find(searchQuery)
+            .select('-password -socialIdentityType -socialIdentityNumber -licenseNumber -licenseState -address') // Exclude sensitive data
+            .sort({ 
+                rating: -1, // Sort by rating descending first
+                createdAt: -1 // Then by creation date
+            })
+            .skip(skip)
+            .limit(limitNum);
+
+        // Get total count for pagination info
+        const totalNurses = await Nurse.countDocuments(searchQuery);
+        const totalPages = Math.ceil(totalNurses / limitNum);
+
         return res.status(200).json({ 
             message: "Nurses retrieved successfully", 
-            nurses: nurses 
+            nurses: nurses,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: totalPages,
+                totalNurses: totalNurses,
+                hasNext: pageNum < totalPages,
+                hasPrev: pageNum > 1
+            }
         });
     } catch (error) {
         console.error('Error getting nurses:', error);
