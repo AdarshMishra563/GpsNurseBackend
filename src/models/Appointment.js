@@ -30,6 +30,7 @@ const appointmentSchema = new mongoose.Schema({
         default: 'pending'
     },
      eventDate: { type: Date },
+     rating:String,
     // Nurse data as plain fields
     nurseName: String,
     nurseEmail: String,
