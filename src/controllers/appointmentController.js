@@ -42,7 +42,7 @@ exports.createAppointment = async (req, res) => {
             distance: distance || 0,
             token: token || '',
             status,eventDate,
-            rating,
+            rating:nurseData.rating,
             // Nurse data as plain fields
             nurseName: nurseData?.name || '',
             nurseEmail: nurseData?.email || '',
