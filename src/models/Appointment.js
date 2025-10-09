@@ -29,7 +29,7 @@ const appointmentSchema = new mongoose.Schema({
         enum: ['pending', 'accepted', 'completed', 'cancelled', 'in_progress', 'rejected'],
         default: 'pending'
     },
-    
+     eventDate: { type: Date, required: true },
     // Nurse data as plain fields
     nurseName: String,
     nurseEmail: String,

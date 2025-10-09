@@ -12,6 +12,7 @@ exports.createAppointment = async (req, res) => {
             userCoords,
             nurseCoords,
             nurseData,
+             bookingDateTime,
             status = 'pending'
         } = req.body;
         
@@ -40,7 +41,7 @@ exports.createAppointment = async (req, res) => {
             amount,
             distance: distance || 0,
             token: token || '',
-            status,
+            status,eventDate: bookingDateTime,
             
             // Nurse data as plain fields
             nurseName: nurseData?.name || '',
