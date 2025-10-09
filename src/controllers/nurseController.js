@@ -285,7 +285,41 @@ exports.getNurseStatus = async (req, res) => {
 
 exports.getAllNurses = async (req, res) => {
     try {
-        const { search, page = 1, limit = 10 } = req.query;
+        const { search, page = 1, limit = 10, id } = req.query;
+        
+        // If ID is provided, return specific nurse in array format
+        if (id) {
+            const nurse = await Nurse.findById(id)
+                .select('-password -socialIdentityType -socialIdentityNumber -licenseNumber -licenseState -address'); // Exclude sensitive data
+            
+            if (!nurse) {
+                return res.status(404).json({ 
+                    message: 'Nurse not found',
+                    nurses: [],
+                    pagination: {
+                        currentPage: 1,
+                        totalPages: 0,
+                        totalNurses: 0,
+                        hasNext: false,
+                        hasPrev: false
+                    }
+                });
+            }
+
+            return res.status(200).json({ 
+                message: "Nurse retrieved successfully", 
+                nurses: [nurse], // Send as array with single item
+                pagination: {
+                    currentPage: 1,
+                    totalPages: 1,
+                    totalNurses: 1,
+                    hasNext: false,
+                    hasPrev: false
+                }
+            });
+        }
+
+        // Otherwise, proceed with search and pagination
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
@@ -321,7 +355,7 @@ exports.getAllNurses = async (req, res) => {
 
         return res.status(200).json({ 
             message: "Nurses retrieved successfully", 
-            nurses: nurses,
+            nurses: nurses, // Array of nurses
             pagination: {
                 currentPage: pageNum,
                 totalPages: totalPages,
@@ -332,7 +366,33 @@ exports.getAllNurses = async (req, res) => {
         });
     } catch (error) {
         console.error('Error getting nurses:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+        
+        // Handle invalid ObjectId format
+        if (error.name === 'CastError') {
+            return res.status(400).json({ 
+                message: 'Invalid nurse ID format',
+                nurses: [],
+                pagination: {
+                    currentPage: 1,
+                    totalPages: 0,
+                    totalNurses: 0,
+                    hasNext: false,
+                    hasPrev: false
+                }
+            });
+        }
+        
+        return res.status(500).json({ 
+            message: 'Internal server error',
+            nurses: [],
+            pagination: {
+                currentPage: 1,
+                totalPages: 0,
+                totalNurses: 0,
+                hasNext: false,
+                hasPrev: false
+            }
+        });
     }
 };
 // Update nurse coordinates (using middleware extracted user ID)
