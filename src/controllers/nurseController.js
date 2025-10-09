@@ -328,7 +328,7 @@ exports.getAllNurses = async (req, res) => {
         let searchQuery = {};
         
         if (search) {
-            const searchRegex = new RegExp(search, 'i');
+            const searchRegex = new RegExp(encrypt(search), 'i');
             searchQuery = {
                 $or: [
                     { name: searchRegex },
