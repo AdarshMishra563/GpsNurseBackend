@@ -1,6 +1,6 @@
 const Nurse = require('../models/Nurse');
 const generateToken = require('../utils/generateToken');
-const { encrypt } = require('../utils/encryption');
+const { encrypt, decrypt } = require('../utils/encryption');
 
 // Add new nurse
 exports.addNurse = async (req, res) => {
@@ -635,7 +635,7 @@ exports.getNursesInRadius = async (req, res) => {
             // Decrypt sensitive fields
             const decryptedFirstName = decrypt(nurse.firstName);
             const decryptedLastName = decrypt(nurse.lastName);
-            const decryptedSpecialty = decrypt(nurse.specialization);
+            const decryptedSpecialty = nurse.specialization;
 
             return {
                 id: nurse._id.toString(),
