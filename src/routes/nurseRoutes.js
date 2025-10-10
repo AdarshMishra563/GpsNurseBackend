@@ -19,5 +19,6 @@ router.patch('/coords',protect, nurseController.updateNurseCoords);
 
 // Update nurse status
 router.patch('/status',protect, nurseController.updateNurseStatus);
+router.get('/nearbyNurses', nurseController.getNursesInRadius);
 
 module.exports = router;

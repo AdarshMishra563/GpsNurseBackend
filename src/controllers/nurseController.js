@@ -477,3 +477,221 @@ exports.updateNurseStatus = async (req, res) => {
         return res.status(500).json({ message: 'Internal server error' });
     }
 };
+
+exports.getNursesInRadius = async (req, res) => {
+    try {
+        const { latitude, longitude, page = 1, limit = 10 } = req.query;
+
+        // Validate coordinates
+        if (!latitude || !longitude) {
+            return res.status(400).json({ 
+                message: 'Latitude and longitude are required' 
+            });
+        }
+
+        const userLat = parseFloat(latitude);
+        const userLng = parseFloat(longitude);
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        if (isNaN(userLat) || isNaN(userLng)) {
+            return res.status(400).json({ 
+                message: 'Invalid latitude or longitude format' 
+            });
+        }
+
+        // Earth radius in kilometers
+        const earthRadiusKm = 6371;
+        const radiusInKm = 150;
+
+        // MongoDB aggregation pipeline for geospatial query
+        const nurses = await Nurse.aggregate([
+            {
+                $match: {
+                    'coords.latitude': { $ne: null },
+                    'coords.longitude': { $ne: null },
+                    status: { $in: ['active', 'engaged'] } // Only active nurses
+                }
+            },
+            {
+                $addFields: {
+                    distance: {
+                        $multiply: [
+                            earthRadiusKm,
+                            {
+                                $acos: {
+                                    $add: [
+                                        {
+                                            $multiply: [
+                                                { $sin: { $degreesToRadians: userLat } },
+                                                { $sin: { $degreesToRadians: '$coords.latitude' } }
+                                            ]
+                                        },
+                                        {
+                                            $multiply: [
+                                                { $cos: { $degreesToRadians: userLat } },
+                                                { $cos: { $degreesToRadians: '$coords.latitude' } },
+                                                { $cos: { $degreesToRadians: { $subtract: [userLng, '$coords.longitude'] } } }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                $match: {
+                    distance: { $lte: radiusInKm }
+                }
+            },
+            {
+                $sort: { 
+                    rating: -1, // Sort by rating first
+                    distance: 1 // Then by distance
+                }
+            },
+            {
+                $skip: skip
+            },
+            {
+                $limit: limitNum
+            },
+            {
+                $project: {
+                    password: 0,
+                    socialIdentityType: 0,
+                    socialIdentityNumber: 0,
+                    licenseNumber: 0,
+                    licenseState: 0,
+                    address: 0,
+                    socketId: 0,
+                    createdAt: 0,
+                    updatedAt: 0
+                }
+            }
+        ]);
+
+        // Get total count for pagination
+        const totalCount = await Nurse.aggregate([
+            {
+                $match: {
+                    'coords.latitude': { $ne: null },
+                    'coords.longitude': { $ne: null },
+                    status: { $in: ['active', 'engaged'] }
+                }
+            },
+            {
+                $addFields: {
+                    distance: {
+                        $multiply: [
+                            earthRadiusKm,
+                            {
+                                $acos: {
+                                    $add: [
+                                        {
+                                            $multiply: [
+                                                { $sin: { $degreesToRadians: userLat } },
+                                                { $sin: { $degreesToRadians: '$coords.latitude' } }
+                                            ]
+                                        },
+                                        {
+                                            $multiply: [
+                                                { $cos: { $degreesToRadians: userLat } },
+                                                { $cos: { $degreesToRadians: '$coords.latitude' } },
+                                                { $cos: { $degreesToRadians: { $subtract: [userLng, '$coords.longitude'] } } }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                $match: {
+                    distance: { $lte: radiusInKm }
+                }
+            },
+            {
+                $count: 'total'
+            }
+        ]);
+
+        const totalNurses = totalCount.length > 0 ? totalCount[0].total : 0;
+        const totalPages = Math.ceil(totalNurses / limitNum);
+
+        // Decrypt nurse data and format response
+        const formattedNurses = nurses.map((nurse, index) => {
+            // Assign medals based on ranking (top 3 get medals, others get none)
+            let medal = 'none';
+            if (index === 0) medal = 'gold';
+            else if (index === 1) medal = 'silver';
+            else if (index === 2) medal = 'bronze';
+
+            // Decrypt sensitive fields
+            const decryptedFirstName = decrypt(nurse.firstName);
+            const decryptedLastName = decrypt(nurse.lastName);
+            const decryptedSpecialty = decrypt(nurse.specialization);
+
+            return {
+                id: nurse._id.toString(),
+                name: `${decryptedFirstName} ${decryptedLastName}`,
+                specialty: decryptedSpecialty,
+                experience: `${nurse.yearsOfExperience} years`,
+                rating: nurse.rating || 4.0, // Default rating if not set
+                distance: `${nurse.distance.toFixed(1)} km`,
+                image: nurse.image || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80',
+                medal: medal,
+                coords: nurse.coords,
+                status: nurse.status,
+                fcm: nurse.fcm
+            };
+        });
+
+        // If no specific ordering is needed, you can also assign medals randomly
+        const nursesWithRandomMedals = formattedNurses.map(nurse => {
+            // Random medal assignment (optional - remove if you want ranking-based medals)
+            const medals = ['gold', 'silver', 'bronze', 'none', 'none', 'none'];
+            const randomMedal = medals[Math.floor(Math.random() * medals.length)];
+            
+            return {
+                ...nurse,
+                medal: randomMedal
+            };
+        });
+
+        return res.status(200).json({ 
+            message: "Nurses retrieved successfully", 
+            nurses: nursesWithRandomMedals, // Use random medals version
+            pagination: {
+                currentPage: pageNum,
+                totalPages: totalPages,
+                totalNurses: totalNurses,
+                hasNext: pageNum < totalPages,
+                hasPrev: pageNum > 1
+            },
+            location: {
+                userLatitude: userLat,
+                userLongitude: userLng,
+                radius: radiusInKm
+            }
+        });
+    } catch (error) {
+        console.error('Error getting nurses in radius:', error);
+        return res.status(500).json({ 
+            message: 'Internal server error',
+            nurses: [],
+            pagination: {
+                currentPage: 1,
+                totalPages: 0,
+                totalNurses: 0,
+                hasNext: false,
+                hasPrev: false
+            }
+        });
+    }
+};
