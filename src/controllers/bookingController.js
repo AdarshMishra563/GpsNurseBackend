@@ -112,7 +112,7 @@ nursesToNotify.forEach(nurse => {
     id: nurse.id, // <-- must be 'id' to match backend
     role: "nurse",
     type: "newBooking",
-    role:bookingData.type,
+   
     bookingId: bookingData.bookingId || '',
     userId: bookingData.userId || '',
     userName: bookingData.userName || '',
